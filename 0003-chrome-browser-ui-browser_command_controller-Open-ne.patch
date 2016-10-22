@@ -1,0 +1,34 @@
+From cd5dc580680adde118a04e370c8f6510b7827ade Mon Sep 17 00:00:00 2001
+From: My Name <my@email>
+Date: Mon, 13 Jul 2015 18:49:06 +0200
+Subject: [PATCH 3/7] chrome/browser/ui/browser_command_controller: Open new
+ tabs after the currently selected tab instead of at the end.
+
+---
+ chrome/browser/ui/browser_command_controller.cc | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
+index 6da32e1..380e901 100644
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -30,6 +30,7 @@
+ #include "chrome/browser/sync/profile_sync_service_factory.h"
+ #include "chrome/browser/ui/bookmarks/bookmark_tab_helper.h"
+ #include "chrome/browser/ui/browser.h"
++#include "chrome/browser/ui/browser_tabstrip.h"
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/chrome_pages.h"
+@@ -365,7 +366,7 @@ void BrowserCommandController::ExecuteCommandWithDisposition(
+       CloseWindow(browser_);
+       break;
+     case IDC_NEW_TAB:
+-      NewTab(browser_);
++      AddTabAt(browser_, GURL(), browser_->tab_strip_model()->active_index()+1, true);
+       break;
+     case IDC_CLOSE_TAB:
+       content::RecordAction(base::UserMetricsAction("CloseTabByKey"));
+-- 
+2.1.4
+

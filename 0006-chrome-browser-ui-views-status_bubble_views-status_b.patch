@@ -1,0 +1,35 @@
+From 3780b643a21dd8920c0e1f621014c988682e9692 Mon Sep 17 00:00:00 2001
+From: My Name <my@email>
+Date: Sat, 22 Oct 2016 13:26:50 +0200
+Subject: [PATCH 6/7] chrome/browser/ui/views/status_bubble_views:
+ status_bubble: Display status bubble in full size always.
+
+---
+ chrome/browser/ui/views/status_bubble_views.cc | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/chrome/browser/ui/views/status_bubble_views.cc b/chrome/browser/ui/views/status_bubble_views.cc
+index fcf809c..507febf 100644
+--- a/chrome/browser/ui/views/status_bubble_views.cc
++++ b/chrome/browser/ui/views/status_bubble_views.cc
+@@ -619,7 +619,7 @@ StatusBubbleViews::StatusBubbleViews(views::View* base_view,
+       base_view_(base_view),
+       view_(NULL),
+       download_shelf_is_visible_(false),
+-      is_expanded_(false),
++      is_expanded_(true),
+       has_client_edge_(has_client_edge),
+       expand_timer_factory_(this) {
+   expand_view_.reset();
+@@ -753,7 +753,7 @@ void StatusBubbleViews::SetURL(const GURL& url) {
+ 
+   // Reset expansion state only when bubble is completely hidden.
+   if (view_->state() == StatusView::BUBBLE_HIDDEN) {
+-    is_expanded_ = false;
++    is_expanded_ = true;
+     SetBubbleWidth(GetStandardStatusBubbleWidth());
+   }
+ 
+-- 
+2.1.4
+

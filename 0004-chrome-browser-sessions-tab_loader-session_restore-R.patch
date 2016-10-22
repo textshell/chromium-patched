@@ -1,0 +1,34 @@
+From 2a394c7ec6cb1ef23c49a2fe1332cc250d448f60 Mon Sep 17 00:00:00 2001
+From: My Name <my@email>
+Date: Mon, 13 Jul 2015 20:07:35 +0200
+Subject: [PATCH 4/7] chrome/browser/sessions/tab_loader: session_restore:
+ Restore tab in crashed state.
+
+---
+ chrome/browser/sessions/tab_loader.cc | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/chrome/browser/sessions/tab_loader.cc b/chrome/browser/sessions/tab_loader.cc
+index 5f47db8..1d0c2de 100644
+--- a/chrome/browser/sessions/tab_loader.cc
++++ b/chrome/browser/sessions/tab_loader.cc
+@@ -171,7 +171,7 @@ void TabLoader::LoadNextTab() {
+     DCHECK(controller);
+     tabs_loading_.insert(controller);
+     tabs_to_load_.pop_front();
+-    controller->LoadIfNecessary();
++    //controller->LoadIfNecessary();
+     content::WebContents* contents = controller->GetWebContents();
+     if (contents) {
+       Browser* browser = chrome::FindBrowserWithWebContents(contents);
+@@ -185,6 +185,7 @@ void TabLoader::LoadNextTab() {
+         // the Browser as at that time not everything has been created, so that
+         // the call would do nothing.
+         contents->WasHidden();
++        contents->SetIsCrashed(base::TERMINATION_STATUS_PROCESS_WAS_KILLED, 0);
+       }
+     }
+   }
+-- 
+2.1.4
+

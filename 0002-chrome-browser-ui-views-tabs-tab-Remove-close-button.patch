@@ -1,0 +1,25 @@
+From ce538cad97b7cf5fbfaae97ddc908b2d783659e5 Mon Sep 17 00:00:00 2001
+From: My Name <my@email>
+Date: Mon, 13 Jul 2015 17:56:38 +0200
+Subject: [PATCH 2/7] chrome/browser/ui/views/tabs/tab: Remove close button
+ from tab.
+
+---
+ chrome/browser/ui/views/tabs/tab.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/chrome/browser/ui/views/tabs/tab.cc b/chrome/browser/ui/views/tabs/tab.cc
+index 45a45ed..4a3efe3 100644
+--- a/chrome/browser/ui/views/tabs/tab.cc
++++ b/chrome/browser/ui/views/tabs/tab.cc
+@@ -1737,6 +1737,7 @@ bool Tab::ShouldShowAlertIndicator() const {
+ }
+ 
+ bool Tab::ShouldShowCloseBox() const {
++  return false;
+   if (!IsActive() && controller_->ShouldHideCloseButtonForInactiveTabs())
+     return false;
+ 
+-- 
+2.1.4
+

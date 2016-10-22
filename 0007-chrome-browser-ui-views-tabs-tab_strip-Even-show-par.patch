@@ -1,0 +1,26 @@
+From aff598df8d67597a5dfb893534316ed2eb177952 Mon Sep 17 00:00:00 2001
+From: My Name <my@email>
+Date: Sat, 22 Oct 2016 15:47:40 +0200
+Subject: [PATCH 7/7] chrome/browser/ui/views/tabs/tab_strip: Even show partial
+ tabs.
+
+---
+ chrome/browser/ui/views/tabs/tab_strip.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/chrome/browser/ui/views/tabs/tab_strip.cc b/chrome/browser/ui/views/tabs/tab_strip.cc
+index 8446b1b..97a760c 100644
+--- a/chrome/browser/ui/views/tabs/tab_strip.cc
++++ b/chrome/browser/ui/views/tabs/tab_strip.cc
+@@ -903,7 +903,7 @@ bool TabStrip::ShouldTabBeVisible(const Tab* tab) const {
+   // button area, even when the button is invisible, so that they don't appear
+   // to "pop in" when the button disappears.
+   // TODO: Probably doesn't work for RTL
+-  int right_edge = tab->bounds().right();
++  int right_edge = tab->bounds().x();
+   const int visible_width = tab->dragging() ? width() : GetTabAreaWidth();
+   if (right_edge > visible_width)
+     return false;
+-- 
+2.1.4
+

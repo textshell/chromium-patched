@@ -1,0 +1,27 @@
+# get the build environment set up by using https://www.chromium.org/developers/how-tos/get-the-code
+
+# this is not a script. Engage brain.
+
+mkdir chromium-54/
+cd chromium-54/
+fetch chromium
+cd src
+git fetch --tags
+git checkout -b my-54 54.0.2840.72
+gclient sync --with_branch_heads --jobs 16
+gclient runhooks
+gn args out/Default
+
+is_debug = false
+ffmpeg_branding="Chrome"
+is_component_build=true
+is_desktop_linux=true
+proprietary_codecs=true
+remove_webcore_debug_symbols=true
+rtc_use_h264=true
+
+git am path-to-patches/0*.patch
+
+ninja -C out/Default chrome
+
+out/Default/chrome --no-sandbox

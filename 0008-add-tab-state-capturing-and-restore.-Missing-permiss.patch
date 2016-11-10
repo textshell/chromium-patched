@@ -1,0 +1,323 @@
+From 40a7f84c7313878dfefd673fb235120ebb21b892 Mon Sep 17 00:00:00 2001
+From: My Name <my@email>
+Date: Thu, 10 Nov 2016 01:58:58 +0100
+Subject: [PATCH] add tab state capturing and restore. Missing permission
+ management.
+
+---
+ chrome/browser/extensions/api/tabs/tabs_api.cc  | 65 +++++++++++++++++++
+ chrome/browser/extensions/api/tabs/tabs_api.h   |  5 ++
+ chrome/browser/extensions/extension_tab_util.cc | 84 +++++++++++++++++++++++++
+ chrome/browser/extensions/extension_tab_util.h  |  1 +
+ chrome/browser/ui/tab_helpers.h                 |  6 ++
+ chrome/common/extensions/api/tabs.json          | 36 +++++++++++
+ 6 files changed, 197 insertions(+)
+
+diff --git a/chrome/browser/extensions/api/tabs/tabs_api.cc b/chrome/browser/extensions/api/tabs/tabs_api.cc
+index 093bd9f..9117184 100644
+--- a/chrome/browser/extensions/api/tabs/tabs_api.cc
++++ b/chrome/browser/extensions/api/tabs/tabs_api.cc
+@@ -101,6 +101,13 @@
+ #include "extensions/browser/app_window/app_window_registry.h"  // nogncheck
+ #endif
+ 
++#include "base/base64.h"
++#include "base/pickle.h"
++#include "base/values.h"
++#include "base/json/json_writer.h"
++#include "components/sessions/content/content_serialized_navigation_builder.h"
++#include "components/sessions/core/serialized_navigation_entry.h"
++
+ using content::BrowserThread;
+ using content::NavigationController;
+ using content::NavigationEntry;
+@@ -1037,6 +1044,7 @@ bool TabsCreateFunction::RunSync() {
+   AssignOptionalValue(params->create_properties.pinned, options.pinned);
+   AssignOptionalValue(params->create_properties.index, options.index);
+   AssignOptionalValue(params->create_properties.url, options.url);
++  AssignOptionalValue(params->create_properties.restore_data, options.restore_data);
+ 
+   std::string error;
+   std::unique_ptr<base::DictionaryValue> result(
+@@ -1118,6 +1126,63 @@ bool TabsGetFunction::RunSync() {
+   return true;
+ }
+ 
++bool TabsGetRestoreDataFunction::RunSync() {
++  std::unique_ptr<tabs::GetRestoreData::Params> params(tabs::GetRestoreData::Params::Create(*args_));
++  EXTENSION_FUNCTION_VALIDATE(params.get());
++  int tab_id = params->tab_id;
++
++  TabStripModel* tab_strip = NULL;
++  WebContents* contents = NULL;
++  int tab_index = -1;
++  if (!GetTabById(tab_id,
++                  GetProfile(),
++                  include_incognito(),
++                  NULL,
++                  &tab_strip,
++                  &contents,
++                  &tab_index,
++                  &error_))
++    return false;
++
++  api::tabs::TabRestoreInfo info;
++
++  content::NavigationController& nav_ctrl = contents->GetController();
++
++  base::DictionaryValue toplevel;
++  toplevel.SetInteger("current_nav", nav_ctrl.GetCurrentEntryIndex());
++  std::unique_ptr<base::ListValue> navs(new base::ListValue());
++  int count = nav_ctrl.GetEntryCount();
++  for (int i = 0; i < count; i++) {
++    NavigationEntry* nav_entry = nav_ctrl.GetEntryAtIndex(i);
++
++    if (nav_entry) {
++      sessions::SerializedNavigationEntry sne = sessions::ContentSerializedNavigationBuilder::FromNavigationEntry(0, *nav_entry);
++      base::Pickle pickle;
++      sne.WriteToPickle(1024*1024, &pickle);
++      auto bin = base::StringPiece((const char *)pickle.data(), pickle.size());
++      std::string tmp;
++      base::Base64Encode(bin, &tmp);
++      std::unique_ptr<base::DictionaryValue> dict(new base::DictionaryValue());
++      dict->SetString("url", sne.virtual_url().possibly_invalid_spec());
++      dict->SetString("title", sne.title());
++      dict->SetString("state", tmp);
++      dict->SetString("favicon", sne.favicon_url().possibly_invalid_spec());
++
++      navs->Append(move(dict));
++
++    } else {
++      navs->AppendString("nullptr");
++    }    
++  }
++  toplevel.Set("navs", move(navs));
++
++  std::string json;
++  base::JSONWriter::Write(toplevel, &json);
++  info.data.reset(new std::string(json));
++  results_ = tabs::GetRestoreData::Results::Create(info);
++  return true;
++}
++
+ bool TabsGetCurrentFunction::RunSync() {
+   DCHECK(dispatcher());
+ 
+diff --git a/chrome/browser/extensions/api/tabs/tabs_api.h b/chrome/browser/extensions/api/tabs/tabs_api.h
+index a895eb6..05ca200 100644
+--- a/chrome/browser/extensions/api/tabs/tabs_api.h
++++ b/chrome/browser/extensions/api/tabs/tabs_api.h
+@@ -102,6 +102,11 @@ class TabsGetFunction : public ChromeSyncExtensionFunction {
+   bool RunSync() override;
+   DECLARE_EXTENSION_FUNCTION("tabs.get", TABS_GET)
+ };
++class TabsGetRestoreDataFunction : public ChromeSyncExtensionFunction {
++  ~TabsGetRestoreDataFunction() override {}
++  bool RunSync() override;
++  DECLARE_EXTENSION_FUNCTION("tabs.getRestoreData", TABS_GET)
++};
+ class TabsGetCurrentFunction : public ChromeSyncExtensionFunction {
+   ~TabsGetCurrentFunction() override {}
+   bool RunSync() override;
+diff --git a/chrome/browser/extensions/extension_tab_util.cc b/chrome/browser/extensions/extension_tab_util.cc
+index cfd503c..ffbd5ed 100644
+--- a/chrome/browser/extensions/extension_tab_util.cc
++++ b/chrome/browser/extensions/extension_tab_util.cc
+@@ -48,6 +48,14 @@
+ #include "extensions/common/permissions/permissions_data.h"
+ #include "url/gurl.h"
+ 
++#include "base/base64.h"
++#include "base/pickle.h"
++#include "base/values.h"
++#include "base/json/json_reader.h"
++#include "chrome/browser/ui/tab_helpers.h"
++#include "components/sessions/content/content_serialized_navigation_builder.h"
++#include "components/sessions/core/serialized_navigation_entry.h"
++
+ using content::NavigationEntry;
+ using content::WebContents;
+ 
+@@ -246,6 +254,82 @@ base::DictionaryValue* ExtensionTabUtil::OpenTab(
+       active ? NEW_FOREGROUND_TAB : NEW_BACKGROUND_TAB;
+   navigate_params.tabstrip_index = index;
+   navigate_params.tabstrip_add_types = add_types;
++  if (params.restore_data.get()) {
++    WebContents::CreateParams create_params(
++        browser->profile(),
++        nullptr /* tab_util::GetSiteInstanceForNewTab(browser->profile(), url)*/);
++
++    //create_params.initial_size = params.source_contents->GetContainerBounds().size();
++    if (!active)
++      create_params.initially_hidden = true;
++
++    WebContents* target_contents = WebContents::Create(create_params);
++
++    // New tabs can have WebUI URLs that will make calls back to arbitrary
++    // tab helpers, so the entire set of tab helpers needs to be set up
++    // immediately.
++    TabHelpers::AttachTabHelpers(target_contents);
++    //BrowserNavigatorWebContentsAdoption::AttachTabHelpers(target_contents);
++
++
++    std::vector<sessions::SerializedNavigationEntry> navigations;
++
++    std::string error_msg = "data:text/plain,Error%20parsing%20data:%20";
++
++    std::unique_ptr<base::Value> data = base::JSONReader::Read(*params.restore_data);
++    if (data) {
++      base::DictionaryValue *toplevel = nullptr;
++      data->GetAsDictionary(&toplevel);
++      if (!toplevel) {
++        error_msg += "tl";
++        goto fail;
++      }
++      base::ListValue *navs = nullptr;
++      toplevel->GetList("navs", &navs);
++      if (!navs) {
++        goto fail;
++      }
++      for (std::unique_ptr<base::Value>& current_nav_value : *navs) {
++        base::DictionaryValue *current_nav = nullptr;
++        current_nav_value->GetAsDictionary(&current_nav);
++        if (!current_nav) {
++          error_msg += "navdict";
++          goto fail;
++        }
++        std::string base64;
++        if (!current_nav->GetString("state", &base64)) {
++          error_msg += "state";
++          goto fail;
++        }
++        if (!base64.size()) {
++          error_msg += "state_empty";
++          goto fail;
++        }
++
++        std::string bin;
++        base::Base64Decode(base64, &bin);
++        base::Pickle pickle(bin.data(), bin.size());
++        base::PickleIterator it(pickle);
++
++        navigations.emplace_back();
++        navigations[navigations.size()-1].ReadFromPickle(&it);
++
++      }
++      navigate_params.target_contents = target_contents;
++      std::vector<std::unique_ptr<content::NavigationEntry>> nes =
++        sessions::ContentSerializedNavigationBuilder::ToNavigationEntries(navigations, target_contents->GetBrowserContext());
++
++      int current_nav = navigations.size()-1;
++
++      toplevel->GetInteger("current_nav", &current_nav);
++
++      target_contents->GetController().Restore(current_nav, content::NavigationController::RESTORE_LAST_SESSION_EXITED_CLEANLY, &nes);
++    } else {
++      error_msg += "unparsable";
++fail:
++      navigate_params.url = GURL(error_msg);
++    }
++  }
+   chrome::Navigate(&navigate_params);
+ 
+   // The tab may have been created in a different window, so make sure we look
+diff --git a/chrome/browser/extensions/extension_tab_util.h b/chrome/browser/extensions/extension_tab_util.h
+index 7b34826..89dd12b 100644
+--- a/chrome/browser/extensions/extension_tab_util.h
++++ b/chrome/browser/extensions/extension_tab_util.h
+@@ -50,6 +50,7 @@ class ExtensionTabUtil {
+     std::unique_ptr<int> window_id;
+     std::unique_ptr<int> opener_tab_id;
+     std::unique_ptr<std::string> url;
++    std::unique_ptr<std::string> restore_data;
+     std::unique_ptr<bool> active;
+     std::unique_ptr<bool> pinned;
+     std::unique_ptr<int> index;
+diff --git a/chrome/browser/ui/tab_helpers.h b/chrome/browser/ui/tab_helpers.h
+index 79a8af8..46e5a76 100644
+--- a/chrome/browser/ui/tab_helpers.h
++++ b/chrome/browser/ui/tab_helpers.h
+@@ -21,6 +21,10 @@ namespace prerender {
+ class PrerenderContents;
+ }
+ 
++namespace extensions {
++class ExtensionTabUtil;
++}
++
+ // A "tab contents" is a WebContents that is used as a tab in a browser window
+ // (or the equivalent on Android). The TabHelpers class allows specific classes
+ // to attach the set of tab helpers that is used for tab contents.
+@@ -52,6 +56,8 @@ class TabHelpers {
+   // the full set of tab helpers to deal with it.
+   friend class prerender::PrerenderContents;
+ 
++  friend class extensions::ExtensionTabUtil;
++
+   // FYI: Do NOT add any more friends here. The functions above are the ONLY
+   // ones that need to call AttachTabHelpers; if you think you do, re-read the
+   // design document linked above, especially the section "Reusing tab helpers".
+diff --git a/chrome/common/extensions/api/tabs.json b/chrome/common/extensions/api/tabs.json
+index e457f47..939d638 100644
+--- a/chrome/common/extensions/api/tabs.json
++++ b/chrome/common/extensions/api/tabs.json
+@@ -99,6 +99,18 @@
+         ]
+       },
+       {
++        "id": "TabRestoreInfo",
++        "type": "object",
++        "description": "XXX.",
++        "properties": {
++          "data": {
++            "type": "string",
++            "optional": true,
++            "description": "XXX."
++          }
++        }
++      },
++      {
+         "id": "ZoomSettings",
+         "type": "object",
+         "description": "Defines how zoom changes in a tab are handled and at what scope.",
+@@ -160,6 +172,25 @@
+         ]
+       },
+       {
++        "name": "getRestoreData",
++        "type": "function",
++        "description": "Retrieves Restore data.",
++        "parameters": [
++          {
++            "type": "integer",
++            "name": "tabId",
++            "minimum": 0
++          },
++          {
++            "type": "function",
++            "name": "callback",
++            "parameters": [
++              {"name": "tab", "$ref": "TabRestoreInfo"}
++            ]
++          }
++        ]
++      },
++      {
+         "name": "getCurrent",
+         "type": "function",
+         "description": "Gets the tab that this script call is being made from. May be undefined if called from a non-tab context (for example: a background page or popup view).",
+@@ -351,6 +382,11 @@
+                 "optional": true,
+                 "description": "The URL to navigate the tab to initially. Fully-qualified URLs must include a scheme (i.e. 'http://www.google.com', not 'www.google.com'). Relative URLs will be relative to the current page within the extension. Defaults to the New Tab Page."
+               },
++              "restoreData": {
++                "type": "string",
++                "optional": true,
++                "description": "XXX."
++              },
+               "active": {
+                 "type": "boolean",
+                 "optional": true,
+-- 
+2.1.4
+

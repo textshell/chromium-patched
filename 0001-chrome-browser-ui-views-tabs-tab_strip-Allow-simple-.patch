@@ -13,7 +13,7 @@ diff --git a/chrome/browser/ui/views/tabs/tab_strip.cc b/chrome/browser/ui/views
 index e2919b6..8446b1b 100644
 --- a/chrome/browser/ui/views/tabs/tab_strip.cc
 +++ b/chrome/browser/ui/views/tabs/tab_strip.cc
-@@ -251,8 +251,8 @@ const TabSizeInfo& GetTabSizeInfo() {
+@@ -250,8 +250,8 @@ const TabSizeInfo& GetTabSizeInfo() {
  
    tab_size_info = new TabSizeInfo;
    tab_size_info->pinned_tab_width = Tab::GetPinnedWidth();
@@ -24,7 +24,7 @@ index e2919b6..8446b1b 100644
    tab_size_info->max_size = Tab::GetStandardSize();
    tab_size_info->tab_overlap = GetLayoutConstant(TABSTRIP_TAB_OVERLAP);
    tab_size_info->pinned_to_normal_offset = kPinnedToNonPinnedOffset;
-@@ -981,6 +981,17 @@ void TabStrip::SetSelection(const ui::ListSelectionModel& old_selection,
+@@ -896,6 +896,17 @@ void TabStrip::SetSelection(const ui::ListSelectionModel& old_selection,
        tab_at(new_selection.active())->ActiveStateChanged();
    }
  
@@ -46,8 +46,8 @@ index e2919b6..8446b1b 100644
      // Don't let the tabstrip shrink smaller than is necessary to show one tab,
      // and don't force it to be larger than is necessary to show 20 tabs.
      const int largest_min_tab_width =
--        min_selected_width + 19 * (min_unselected_width - tab_overlap);
-+        min_selected_width + 4 * (min_unselected_width - tab_overlap);
+-        min_selected_width + 19 * (min_unselected_width - Tab::kOverlap);
++        min_selected_width + 4 * (min_unselected_width - Tab::kOverlap);
      needed_tab_width = std::min(
          std::max(needed_tab_width, min_selected_width), largest_min_tab_width);
    }

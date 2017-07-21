@@ -31,7 +31,7 @@ index 093bd9f..9117184 100644
  using content::BrowserThread;
  using content::NavigationController;
  using content::NavigationEntry;
-@@ -1037,6 +1044,7 @@ bool TabsCreateFunction::RunSync() {
+@@ -1037,6 +1044,7 @@ bool TabsCreateFunction::Run() {
    AssignOptionalValue(params->create_properties.pinned, options.pinned);
    AssignOptionalValue(params->create_properties.index, options.index);
    AssignOptionalValue(params->create_properties.url, options.url);
@@ -39,11 +39,11 @@ index 093bd9f..9117184 100644
  
    std::string error;
    std::unique_ptr<base::DictionaryValue> result(
-@@ -1118,6 +1126,63 @@ bool TabsGetFunction::RunSync() {
-   return true;
+@@ -1118,6 +1126,64 @@ ExtensionFunction::ResponseAction TabsGetFunction::Run() {
+          contents, tab_strip, tab_index, extension()))));
  }
  
-+bool TabsGetRestoreDataFunction::RunSync() {
++ExtensionFunction::ResponseAction TabsGetRestoreDataFunction::Run() {
 +  std::unique_ptr<tabs::GetRestoreData::Params> params(tabs::GetRestoreData::Params::Create(*args_));
 +  EXTENSION_FUNCTION_VALIDATE(params.get());
 +  int tab_id = params->tab_id;
@@ -51,6 +51,7 @@ index 093bd9f..9117184 100644
 +  TabStripModel* tab_strip = NULL;
 +  WebContents* contents = NULL;
 +  int tab_index = -1;
++  std::string error;
 +  if (!GetTabById(tab_id,
 +                  GetProfile(),
 +                  include_incognito(),
@@ -58,8 +59,8 @@ index 093bd9f..9117184 100644
 +                  &tab_strip,
 +                  &contents,
 +                  &tab_index,
-+                  &error_))
-+    return false;
++                  &error))
++    return RespondNow(Error(error));
 +
 +  api::tabs::TabRestoreInfo info;
 +
@@ -97,28 +98,28 @@ index 093bd9f..9117184 100644
 +  base::JSONWriter::Write(toplevel, &json);
 +  info.data.reset(new std::string(json));
 +  results_ = tabs::GetRestoreData::Results::Create(info);
-+  return true;
++  return RespondNow(OneArgument(std::move(results_)));
 +}
 +
- bool TabsGetCurrentFunction::RunSync() {
+ ExtensionFunction::ResponseAction TabsGetCurrentFunction::Run() {
    DCHECK(dispatcher());
  
 diff --git a/chrome/browser/extensions/api/tabs/tabs_api.h b/chrome/browser/extensions/api/tabs/tabs_api.h
 index a895eb6..05ca200 100644
 --- a/chrome/browser/extensions/api/tabs/tabs_api.h
 +++ b/chrome/browser/extensions/api/tabs/tabs_api.h
-@@ -102,6 +102,11 @@ class TabsGetFunction : public ChromeSyncExtensionFunction {
-   bool RunSync() override;
+@@ -102,6 +102,11 @@ class TabsGetFunction : public UIThreadExtensionFunction {
+   ResponseAction Run() override;
    DECLARE_EXTENSION_FUNCTION("tabs.get", TABS_GET)
  };
-+class TabsGetRestoreDataFunction : public ChromeSyncExtensionFunction {
++class TabsGetRestoreDataFunction : public UIThreadExtensionFunction {
 +  ~TabsGetRestoreDataFunction() override {}
-+  bool RunSync() override;
++  ResponseAction Run() override;
 +  DECLARE_EXTENSION_FUNCTION("tabs.getRestoreData", TABS_GET)
 +};
- class TabsGetCurrentFunction : public ChromeSyncExtensionFunction {
+ class TabsGetCurrentFunction : public UIThreadExtensionFunction {
    ~TabsGetCurrentFunction() override {}
-   bool RunSync() override;
+   ResponseAction Run() override;
 diff --git a/chrome/browser/extensions/extension_tab_util.cc b/chrome/browser/extensions/extension_tab_util.cc
 index cfd503c..ffbd5ed 100644
 --- a/chrome/browser/extensions/extension_tab_util.cc

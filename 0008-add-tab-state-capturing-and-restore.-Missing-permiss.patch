@@ -39,7 +39,7 @@ index 093bd9f..9117184 100644
  
    std::string error;
    std::unique_ptr<base::DictionaryValue> result(
-@@ -1118,6 +1126,64 @@ ExtensionFunction::ResponseAction TabsGetFunction::Run() {
+@@ -1118,6 +1126,65 @@ ExtensionFunction::ResponseAction TabsGetFunction::Run() {
           contents, tab_strip, tab_index, extension()))));
  }
  
@@ -53,7 +53,7 @@ index 093bd9f..9117184 100644
 +  int tab_index = -1;
 +  std::string error;
 +  if (!GetTabById(tab_id,
-+                  GetProfile(),
++                  browser_context(),
 +                  include_incognito(),
 +                  NULL,
 +                  &tab_strip,
@@ -97,8 +97,9 @@ index 093bd9f..9117184 100644
 +  std::string json;
 +  base::JSONWriter::Write(toplevel, &json);
 +  info.data.reset(new std::string(json));
-+  results_ = tabs::GetRestoreData::Results::Create(info);
-+  return RespondNow(OneArgument(std::move(results_)));
++  std::unique_ptr<base::ListValue> results;
++  results = tabs::GetRestoreData::Results::Create(info);
++  return RespondNow(OneArgument(std::move(results)));
 +}
 +
  ExtensionFunction::ResponseAction TabsGetCurrentFunction::Run() {
@@ -124,7 +125,7 @@ diff --git a/chrome/browser/extensions/extension_tab_util.cc b/chrome/browser/ex
 index cfd503c..ffbd5ed 100644
 --- a/chrome/browser/extensions/extension_tab_util.cc
 +++ b/chrome/browser/extensions/extension_tab_util.cc
-@@ -48,6 +48,14 @@
+@@ -48,6 +48,15 @@
  #include "extensions/common/permissions/permissions_data.h"
  #include "url/gurl.h"
  
@@ -135,6 +136,7 @@ index cfd503c..ffbd5ed 100644
 +#include "chrome/browser/ui/tab_helpers.h"
 +#include "components/sessions/content/content_serialized_navigation_builder.h"
 +#include "components/sessions/core/serialized_navigation_entry.h"
++#include "content/public/browser/restore_type.h"
 +
  using content::NavigationEntry;
  using content::WebContents;
@@ -157,7 +159,7 @@ index cfd503c..ffbd5ed 100644
 +    // New tabs can have WebUI URLs that will make calls back to arbitrary
 +    // tab helpers, so the entire set of tab helpers needs to be set up
 +    // immediately.
-+    TabHelpers::AttachTabHelpers(target_contents);
++    TabHelpers::AttachTabHelpers(target_contents,{});
 +    //BrowserNavigatorWebContentsAdoption::AttachTabHelpers(target_contents);
 +
 +
@@ -178,9 +180,9 @@ index cfd503c..ffbd5ed 100644
 +      if (!navs) {
 +        goto fail;
 +      }
-+      for (std::unique_ptr<base::Value>& current_nav_value : *navs) {
++      for (base::Value& current_nav_value : *navs) {
 +        base::DictionaryValue *current_nav = nullptr;
-+        current_nav_value->GetAsDictionary(&current_nav);
++        current_nav_value.GetAsDictionary(&current_nav);
 +        if (!current_nav) {
 +          error_msg += "navdict";
 +          goto fail;
@@ -212,7 +214,7 @@ index cfd503c..ffbd5ed 100644
 +
 +      toplevel->GetInteger("current_nav", &current_nav);
 +
-+      target_contents->GetController().Restore(current_nav, content::NavigationController::RESTORE_LAST_SESSION_EXITED_CLEANLY, &nes);
++      target_contents->GetController().Restore(current_nav, content::RestoreType::LAST_SESSION_EXITED_CLEANLY, &nes);
 +    } else {
 +      error_msg += "unparsable";
 +fail:

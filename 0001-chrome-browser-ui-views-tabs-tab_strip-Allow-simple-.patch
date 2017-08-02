@@ -46,8 +46,8 @@ index e2919b6..8446b1b 100644
      // Don't let the tabstrip shrink smaller than is necessary to show one tab,
      // and don't force it to be larger than is necessary to show 20 tabs.
      const int largest_min_tab_width =
--        min_selected_width + 19 * (min_unselected_width - Tab::kOverlap);
-+        min_selected_width + 4 * (min_unselected_width - Tab::kOverlap);
+-        min_selected_width + 19 * (min_unselected_width - overlap);
++        min_selected_width + 4 * (min_unselected_width - overlap);
      needed_tab_width = std::min(
          std::max(needed_tab_width, min_selected_width), largest_min_tab_width);
    }

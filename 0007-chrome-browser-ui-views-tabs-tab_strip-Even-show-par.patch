@@ -1,7 +1,7 @@
-From aff598df8d67597a5dfb893534316ed2eb177952 Mon Sep 17 00:00:00 2001
-From: My Name <my@email>
-Date: Sat, 22 Oct 2016 15:47:40 +0200
-Subject: [PATCH 7/7] chrome/browser/ui/views/tabs/tab_strip: Even show partial
+From be69ea71c691686de90f02b001e37133b8cb0bbb Mon Sep 17 00:00:00 2001
+From: Martin Hostettler <textshell@uchuujin.de>
+Date: Sat, 22 Dec 2018 19:57:42 +0100
+Subject: [PATCH 7/9] chrome/browser/ui/views/tabs/tab_strip: Even show partial
  tabs.
 
 ---
@@ -9,18 +9,18 @@ Subject: [PATCH 7/7] chrome/browser/ui/views/tabs/tab_strip: Even show partial
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/chrome/browser/ui/views/tabs/tab_strip.cc b/chrome/browser/ui/views/tabs/tab_strip.cc
-index 8446b1b..97a760c 100644
+index ed53f0eb0b50..a566f6b33787 100644
 --- a/chrome/browser/ui/views/tabs/tab_strip.cc
 +++ b/chrome/browser/ui/views/tabs/tab_strip.cc
-@@ -903,7 +903,7 @@ bool TabStrip::ShouldTabBeVisible(const Tab* tab) const {
-   // button area, even when the button is invisible, so that they don't appear
-   // to "pop in" when the button disappears.
-   // TODO: Probably doesn't work for RTL
--  int right_edge = tab->bounds().right();
-+  int right_edge = tab->bounds().x();
-   const int visible_width = tab->dragging() ? width() : GetTabAreaWidth();
-   if (right_edge > visible_width)
-     return false;
+@@ -642,7 +642,7 @@ bool TabStrip::ShouldTabBeVisible(const Tab* tab) const {
+ 
+   // If the tab is currently clipped by the trailing edge of the strip, it
+   // shouldn't be visible.
+-  const int right_edge = tab->bounds().right();
++  const int right_edge = tab->bounds().x();
+   const int tabstrip_right =
+       tab->dragging() ? TabDragAreaEndX() : (TabStartX() + GetTabAreaWidth());
+   if (right_edge > tabstrip_right)
 -- 
-2.1.4
+2.11.0
 

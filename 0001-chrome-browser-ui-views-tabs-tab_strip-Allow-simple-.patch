@@ -1,7 +1,7 @@
-From bb508a8fe0b95e635c21c7f59ebe4b15fcbad0fc Mon Sep 17 00:00:00 2001
-From: My Name <my@email>
-Date: Sat, 22 Oct 2016 13:07:17 +0200
-Subject: [PATCH 1/7] chrome/browser/ui/views/tabs/tab_strip: Allow simple
+From 9e43014313b155cd919760399c845cf6f28ac422 Mon Sep 17 00:00:00 2001
+From: Martin Hostettler <textshell@uchuujin.de>
+Date: Fri, 21 Dec 2018 16:58:21 +0100
+Subject: [PATCH 1/9] chrome/browser/ui/views/tabs/tab_strip: Allow simple
  scrolling of tab bar. Increase minimum tab width by 60px.
 
 ---
@@ -10,21 +10,21 @@ Subject: [PATCH 1/7] chrome/browser/ui/views/tabs/tab_strip: Allow simple
  2 files changed, 21 insertions(+), 5 deletions(-)
 
 diff --git a/chrome/browser/ui/views/tabs/tab_strip.cc b/chrome/browser/ui/views/tabs/tab_strip.cc
-index e2919b6..8446b1b 100644
+index d284029387de..ed53f0eb0b50 100644
 --- a/chrome/browser/ui/views/tabs/tab_strip.cc
 +++ b/chrome/browser/ui/views/tabs/tab_strip.cc
-@@ -251,8 +251,8 @@ const TabSizeInfo& GetTabSizeInfo() {
- 
-   tab_size_info = new TabSizeInfo;
-   tab_size_info->pinned_tab_width = Tab::GetPinnedWidth();
--  tab_size_info->min_active_width = Tab::GetMinimumActiveSize().width();
--  tab_size_info->min_inactive_width = Tab::GetMinimumInactiveSize().width();
-+  tab_size_info->min_active_width = Tab::GetMinimumActiveSize().width() + 60;
-+  tab_size_info->min_inactive_width = Tab::GetMinimumInactiveSize().width() + 60;
-   tab_size_info->max_size = Tab::GetStandardSize();
-   tab_size_info->tab_overlap = GetLayoutConstant(TABSTRIP_TAB_OVERLAP);
-   tab_size_info->pinned_to_normal_offset = kPinnedToNonPinnedOffset;
-@@ -981,6 +981,17 @@ void TabStrip::SetSelection(const ui::ListSelectionModel& old_selection,
+@@ -193,8 +193,8 @@ const TabSizeInfo& GetTabSizeInfo() {
+       MD::IsTouchOptimizedUiEnabled() ? &touch_tab_size_info : &tab_size_info;
+   if (info->standard_size.IsEmpty()) {
+     info->pinned_tab_width = TabStyle::GetPinnedWidth();
+-    info->min_active_width = TabStyle::GetMinimumActiveWidth();
+-    info->min_inactive_width = TabStyle::GetMinimumInactiveWidth();
++    info->min_active_width = TabStyle::GetMinimumActiveWidth() + 60;
++    info->min_inactive_width = TabStyle::GetMinimumInactiveWidth() + 60;
+     info->standard_size =
+         gfx::Size(TabStyle::GetStandardWidth(), GetLayoutConstant(TAB_HEIGHT));
+     info->tab_overlap = TabStyle::GetTabOverlap();
+@@ -685,6 +685,17 @@ void TabStrip::SetSelection(const ui::ListSelectionModel& new_selection) {
        tab_at(new_selection.active())->ActiveStateChanged();
    }
  
@@ -42,17 +42,17 @@ index e2919b6..8446b1b 100644
    if (touch_layout_) {
      touch_layout_->SetActiveIndex(new_selection.active());
      // Only start an animation if we need to. Otherwise clicking on an
-@@ -1591,7 +1602,7 @@ gfx::Size TabStrip::GetPreferredSize() const {
+@@ -1358,7 +1369,7 @@ gfx::Size TabStrip::CalculatePreferredSize() const {
      // Don't let the tabstrip shrink smaller than is necessary to show one tab,
      // and don't force it to be larger than is necessary to show 20 tabs.
      const int largest_min_tab_width =
--        min_selected_width + 19 * (min_unselected_width - tab_overlap);
-+        min_selected_width + 4 * (min_unselected_width - tab_overlap);
-     needed_tab_width = std::min(
-         std::max(needed_tab_width, min_selected_width), largest_min_tab_width);
+-        min_selected_width + 19 * (min_unselected_width - overlap);
++        min_selected_width + 4 * (min_unselected_width - overlap);
+     needed_tab_width = std::min(std::max(needed_tab_width, min_selected_width),
+                                 largest_min_tab_width);
    }
-@@ -2499,8 +2510,11 @@ void TabStrip::GenerateIdealBounds() {
-                         &current_active_width_, &current_inactive_width_);
+@@ -2254,8 +2265,11 @@ void TabStrip::GenerateIdealBounds() {
+         &current_active_width_, &current_inactive_width_);
      DCHECK_EQ(static_cast<size_t>(tab_count()), tabs_bounds.size());
  
 -    for (size_t i = 0; i < tabs_bounds.size(); ++i)
@@ -64,20 +64,20 @@ index e2919b6..8446b1b 100644
 +    }
    }
  
-   const int max_new_tab_x = width() - newtab_button_bounds_.width();
+   new_tab_button_bounds_.set_origin(gfx::Point(NewTabButtonIdealX(), 0));
 diff --git a/chrome/browser/ui/views/tabs/tab_strip.h b/chrome/browser/ui/views/tabs/tab_strip.h
-index 1a29593..d6f668e 100644
+index fbdbde8326c9..e47a7d135ec4 100644
 --- a/chrome/browser/ui/views/tabs/tab_strip.h
 +++ b/chrome/browser/ui/views/tabs/tab_strip.h
-@@ -652,6 +652,8 @@ class TabStrip : public views::View,
-   // True if tabs are painted as rectangular light-bars.
-   bool immersive_style_;
+@@ -692,6 +692,8 @@ class TabStrip : public views::View,
+ 
+   SkColor separator_color_ = gfx::kPlaceholderColor;
  
 +  int vert_scroll_offset_ = 0;
 +
-   // Our observers.
-   typedef base::ObserverList<TabStripObserver> TabStripObservers;
-   TabStripObservers observers_;
+   ScopedObserver<ui::MaterialDesignController,
+                  ui::MaterialDesignControllerObserver>
+       md_observer_{this};
 -- 
-2.1.4
+2.11.0
 

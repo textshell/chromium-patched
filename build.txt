@@ -2,14 +2,16 @@
 
 # this is not a script. Engage brain.
 
-mkdir chromium-54/
-cd chromium-54/
+mkdir chromium-71/
+cd chromium-71/
 fetch chromium
 cd src
 git fetch --tags
-git checkout -b my-54 54.0.2840.72
+git checkout -b my-71 71.0.3578.98
 gclient sync --with_branch_heads --jobs 16
 gclient runhooks
+
+gn gen out/Default
 gn args out/Default
 
 is_debug = false

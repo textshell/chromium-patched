@@ -1,28 +1,26 @@
-From 1dfb6106e3eb5b4cd17cee2601adcc8540001ed7 Mon Sep 17 00:00:00 2001
-From: My Name <my@email>
-Date: Sat, 22 Oct 2016 13:24:06 +0200
-Subject: [PATCH 5/7] chrome/browser/ui/views/tabs/tab: Increase tab text to
+From 618ef745d78a85468f9eedf974d9b628c1f71500 Mon Sep 17 00:00:00 2001
+From: Martin Hostettler <textshell@uchuujin.de>
+Date: Fri, 21 Dec 2018 17:26:33 +0100
+Subject: [PATCH 5/9] chrome/browser/ui/views/tabs/tab: Increase tab text to
  maximum possible.
 
 ---
- chrome/browser/ui/views/tabs/tab.cc | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ chrome/browser/ui/views/tabs/tab.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/chrome/browser/ui/views/tabs/tab.cc b/chrome/browser/ui/views/tabs/tab.cc
-index 4a3efe3..6712c45 100644
+index dedaf62bfc7a..a75eb79a91de 100644
 --- a/chrome/browser/ui/views/tabs/tab.cc
 +++ b/chrome/browser/ui/views/tabs/tab.cc
-@@ -71,8 +71,8 @@ namespace {
- // Width of touch tabs.
- const int kTouchWidth = 120;
+@@ -245,7 +245,7 @@ void Tab::Layout() {
  
--const int kExtraLeftPaddingToBalanceCloseButtonPadding = 2;
--const int kAfterTitleSpacing = 4;
-+const int kExtraLeftPaddingToBalanceCloseButtonPadding = 0;
-+const int kAfterTitleSpacing = 0;
+   int start = contents_rect.x();
+   if (extra_padding_before_content_) {
+-    constexpr int kExtraLeftPaddingToBalanceCloseButtonPadding = 4;
++    constexpr int kExtraLeftPaddingToBalanceCloseButtonPadding = 0;
+     start += kExtraLeftPaddingToBalanceCloseButtonPadding;
+   }
  
- // When a non-pinned tab becomes a pinned tab the width of the tab animates. If
- // the width of a pinned tab is at least kPinnedTabExtraWidthToRenderAsNormal
 -- 
-2.1.4
+2.11.0
 

@@ -1,24 +1,24 @@
-From 40a7f84c7313878dfefd673fb235120ebb21b892 Mon Sep 17 00:00:00 2001
-From: My Name <my@email>
-Date: Thu, 10 Nov 2016 01:58:58 +0100
-Subject: [PATCH] add tab state capturing and restore. Missing permission
+From 5e36c76285cf9b2a5856f0e87180f3f87e4753d9 Mon Sep 17 00:00:00 2001
+From: Martin Hostettler <textshell@uchuujin.de>
+Date: Fri, 21 Dec 2018 20:52:39 +0100
+Subject: [PATCH 8/9] add tab state capturing and restore. Missing permission
  management.
 
 ---
- chrome/browser/extensions/api/tabs/tabs_api.cc  | 65 +++++++++++++++++++
+ chrome/browser/extensions/api/tabs/tabs_api.cc  | 68 ++++++++++++++++++++
  chrome/browser/extensions/api/tabs/tabs_api.h   |  5 ++
- chrome/browser/extensions/extension_tab_util.cc | 84 +++++++++++++++++++++++++
+ chrome/browser/extensions/extension_tab_util.cc | 85 +++++++++++++++++++++++++
  chrome/browser/extensions/extension_tab_util.h  |  1 +
  chrome/browser/ui/tab_helpers.h                 |  6 ++
  chrome/common/extensions/api/tabs.json          | 36 +++++++++++
- 6 files changed, 197 insertions(+)
+ 6 files changed, 201 insertions(+)
 
 diff --git a/chrome/browser/extensions/api/tabs/tabs_api.cc b/chrome/browser/extensions/api/tabs/tabs_api.cc
-index 093bd9f..9117184 100644
+index eea41e7722c2..77aa5c84710f 100644
 --- a/chrome/browser/extensions/api/tabs/tabs_api.cc
 +++ b/chrome/browser/extensions/api/tabs/tabs_api.cc
-@@ -101,6 +101,13 @@
- #include "extensions/browser/app_window/app_window_registry.h"  // nogncheck
+@@ -109,6 +109,13 @@
+ #include "ui/base/ui_base_features.h"
  #endif
  
 +#include "base/base64.h"
@@ -31,19 +31,20 @@ index 093bd9f..9117184 100644
  using content::BrowserThread;
  using content::NavigationController;
  using content::NavigationEntry;
-@@ -1037,6 +1044,7 @@ bool TabsCreateFunction::RunSync() {
-   AssignOptionalValue(params->create_properties.pinned, options.pinned);
-   AssignOptionalValue(params->create_properties.index, options.index);
-   AssignOptionalValue(params->create_properties.url, options.url);
-+  AssignOptionalValue(params->create_properties.restore_data, options.restore_data);
+@@ -1081,6 +1088,7 @@ ExtensionFunction::ResponseAction TabsCreateFunction::Run() {
+   AssignOptionalValue(params->create_properties.pinned, &options.pinned);
+   AssignOptionalValue(params->create_properties.index, &options.index);
+   AssignOptionalValue(params->create_properties.url, &options.url);
++  AssignOptionalValue(params->create_properties.restore_data, &options.restore_data);
  
    std::string error;
    std::unique_ptr<base::DictionaryValue> result(
-@@ -1118,6 +1126,63 @@ bool TabsGetFunction::RunSync() {
-   return true;
+@@ -1148,6 +1156,66 @@ ExtensionFunction::ResponseAction TabsGetFunction::Run() {
+                                          extension(), tab_strip, tab_index))));
  }
  
-+bool TabsGetRestoreDataFunction::RunSync() {
++
++ExtensionFunction::ResponseAction TabsGetRestoreDataFunction::Run() {
 +  std::unique_ptr<tabs::GetRestoreData::Params> params(tabs::GetRestoreData::Params::Create(*args_));
 +  EXTENSION_FUNCTION_VALIDATE(params.get());
 +  int tab_id = params->tab_id;
@@ -51,15 +52,16 @@ index 093bd9f..9117184 100644
 +  TabStripModel* tab_strip = NULL;
 +  WebContents* contents = NULL;
 +  int tab_index = -1;
++  std::string error;
 +  if (!GetTabById(tab_id,
-+                  GetProfile(),
-+                  include_incognito(),
++                  browser_context(),
++                  include_incognito_information(),
 +                  NULL,
 +                  &tab_strip,
 +                  &contents,
 +                  &tab_index,
-+                  &error_))
-+    return false;
++                  &error))
++    return RespondNow(Error(error));
 +
 +  api::tabs::TabRestoreInfo info;
 +
@@ -89,41 +91,42 @@ index 093bd9f..9117184 100644
 +
 +    } else {
 +      navs->AppendString("nullptr");
-+    }    
++    }
 +  }
 +  toplevel.Set("navs", move(navs));
 +
 +  std::string json;
 +  base::JSONWriter::Write(toplevel, &json);
 +  info.data.reset(new std::string(json));
-+  results_ = tabs::GetRestoreData::Results::Create(info);
-+  return true;
++  std::unique_ptr<base::ListValue> results;
++  results = tabs::GetRestoreData::Results::Create(info);
++  return RespondNow(ArgumentList(std::move(results)));
 +}
 +
- bool TabsGetCurrentFunction::RunSync() {
+ ExtensionFunction::ResponseAction TabsGetCurrentFunction::Run() {
    DCHECK(dispatcher());
  
 diff --git a/chrome/browser/extensions/api/tabs/tabs_api.h b/chrome/browser/extensions/api/tabs/tabs_api.h
-index a895eb6..05ca200 100644
+index 518c39d0cbee..102e9707bd60 100644
 --- a/chrome/browser/extensions/api/tabs/tabs_api.h
 +++ b/chrome/browser/extensions/api/tabs/tabs_api.h
-@@ -102,6 +102,11 @@ class TabsGetFunction : public ChromeSyncExtensionFunction {
-   bool RunSync() override;
+@@ -97,6 +97,11 @@ class TabsGetFunction : public UIThreadExtensionFunction {
+   ResponseAction Run() override;
    DECLARE_EXTENSION_FUNCTION("tabs.get", TABS_GET)
  };
-+class TabsGetRestoreDataFunction : public ChromeSyncExtensionFunction {
++class TabsGetRestoreDataFunction : public UIThreadExtensionFunction {
 +  ~TabsGetRestoreDataFunction() override {}
-+  bool RunSync() override;
++  ResponseAction Run() override;
 +  DECLARE_EXTENSION_FUNCTION("tabs.getRestoreData", TABS_GET)
 +};
- class TabsGetCurrentFunction : public ChromeSyncExtensionFunction {
+ class TabsGetCurrentFunction : public UIThreadExtensionFunction {
    ~TabsGetCurrentFunction() override {}
-   bool RunSync() override;
+   ResponseAction Run() override;
 diff --git a/chrome/browser/extensions/extension_tab_util.cc b/chrome/browser/extensions/extension_tab_util.cc
-index cfd503c..ffbd5ed 100644
+index 4a307f1f4d58..f0ae160d7e2e 100644
 --- a/chrome/browser/extensions/extension_tab_util.cc
 +++ b/chrome/browser/extensions/extension_tab_util.cc
-@@ -48,6 +48,14 @@
+@@ -49,6 +49,15 @@
  #include "extensions/common/permissions/permissions_data.h"
  #include "url/gurl.h"
  
@@ -134,12 +137,13 @@ index cfd503c..ffbd5ed 100644
 +#include "chrome/browser/ui/tab_helpers.h"
 +#include "components/sessions/content/content_serialized_navigation_builder.h"
 +#include "components/sessions/core/serialized_navigation_entry.h"
++#include "content/public/browser/restore_type.h"
 +
- using content::NavigationEntry;
- using content::WebContents;
- 
-@@ -246,6 +254,82 @@ base::DictionaryValue* ExtensionTabUtil::OpenTab(
-       active ? NEW_FOREGROUND_TAB : NEW_BACKGROUND_TAB;
+ #if defined(OS_CHROMEOS)
+ #include "ash/public/cpp/window_pin_type.h"
+ #endif
+@@ -258,6 +267,82 @@ base::DictionaryValue* ExtensionTabUtil::OpenTab(
+                                     : WindowOpenDisposition::NEW_BACKGROUND_TAB;
    navigate_params.tabstrip_index = index;
    navigate_params.tabstrip_add_types = add_types;
 +  if (params.restore_data.get()) {
@@ -151,12 +155,12 @@ index cfd503c..ffbd5ed 100644
 +    if (!active)
 +      create_params.initially_hidden = true;
 +
-+    WebContents* target_contents = WebContents::Create(create_params);
++    std::unique_ptr<WebContents> target_contents = WebContents::Create(create_params);
 +
 +    // New tabs can have WebUI URLs that will make calls back to arbitrary
 +    // tab helpers, so the entire set of tab helpers needs to be set up
 +    // immediately.
-+    TabHelpers::AttachTabHelpers(target_contents);
++    TabHelpers::AttachTabHelpers(target_contents.get());
 +    //BrowserNavigatorWebContentsAdoption::AttachTabHelpers(target_contents);
 +
 +
@@ -177,9 +181,9 @@ index cfd503c..ffbd5ed 100644
 +      if (!navs) {
 +        goto fail;
 +      }
-+      for (std::unique_ptr<base::Value>& current_nav_value : *navs) {
++      for (base::Value& current_nav_value : *navs) {
 +        base::DictionaryValue *current_nav = nullptr;
-+        current_nav_value->GetAsDictionary(&current_nav);
++        current_nav_value.GetAsDictionary(&current_nav);
 +        if (!current_nav) {
 +          error_msg += "navdict";
 +          goto fail;
@@ -203,7 +207,6 @@ index cfd503c..ffbd5ed 100644
 +        navigations[navigations.size()-1].ReadFromPickle(&it);
 +
 +      }
-+      navigate_params.target_contents = target_contents;
 +      std::vector<std::unique_ptr<content::NavigationEntry>> nes =
 +        sessions::ContentSerializedNavigationBuilder::ToNavigationEntries(navigations, target_contents->GetBrowserContext());
 +
@@ -211,21 +214,22 @@ index cfd503c..ffbd5ed 100644
 +
 +      toplevel->GetInteger("current_nav", &current_nav);
 +
-+      target_contents->GetController().Restore(current_nav, content::NavigationController::RESTORE_LAST_SESSION_EXITED_CLEANLY, &nes);
++      target_contents->GetController().Restore(current_nav, content::RestoreType::LAST_SESSION_EXITED_CLEANLY, &nes);
++      navigate_params.contents_to_insert = move(target_contents);
 +    } else {
 +      error_msg += "unparsable";
 +fail:
 +      navigate_params.url = GURL(error_msg);
 +    }
 +  }
-   chrome::Navigate(&navigate_params);
+   Navigate(&navigate_params);
  
    // The tab may have been created in a different window, so make sure we look
 diff --git a/chrome/browser/extensions/extension_tab_util.h b/chrome/browser/extensions/extension_tab_util.h
-index 7b34826..89dd12b 100644
+index 8d51f78f810d..c5b98aa85d42 100644
 --- a/chrome/browser/extensions/extension_tab_util.h
 +++ b/chrome/browser/extensions/extension_tab_util.h
-@@ -50,6 +50,7 @@ class ExtensionTabUtil {
+@@ -57,6 +57,7 @@ class ExtensionTabUtil {
      std::unique_ptr<int> window_id;
      std::unique_ptr<int> opener_tab_id;
      std::unique_ptr<std::string> url;
@@ -234,7 +238,7 @@ index 7b34826..89dd12b 100644
      std::unique_ptr<bool> pinned;
      std::unique_ptr<int> index;
 diff --git a/chrome/browser/ui/tab_helpers.h b/chrome/browser/ui/tab_helpers.h
-index 79a8af8..46e5a76 100644
+index 72c3e1149f8c..971c1c6198a3 100644
 --- a/chrome/browser/ui/tab_helpers.h
 +++ b/chrome/browser/ui/tab_helpers.h
 @@ -21,6 +21,10 @@ namespace prerender {
@@ -258,7 +262,7 @@ index 79a8af8..46e5a76 100644
    // ones that need to call AttachTabHelpers; if you think you do, re-read the
    // design document linked above, especially the section "Reusing tab helpers".
 diff --git a/chrome/common/extensions/api/tabs.json b/chrome/common/extensions/api/tabs.json
-index e457f47..939d638 100644
+index 158b4b7e8e1d..9c0686ad5e12 100644
 --- a/chrome/common/extensions/api/tabs.json
 +++ b/chrome/common/extensions/api/tabs.json
 @@ -99,6 +99,18 @@
@@ -305,10 +309,10 @@ index e457f47..939d638 100644
 +      {
          "name": "getCurrent",
          "type": "function",
-         "description": "Gets the tab that this script call is being made from. May be undefined if called from a non-tab context (for example: a background page or popup view).",
+         "description": "Gets the tab that this script call is being made from. May be undefined if called from a non-tab context (for example, a background page or popup view).",
 @@ -351,6 +382,11 @@
                  "optional": true,
-                 "description": "The URL to navigate the tab to initially. Fully-qualified URLs must include a scheme (i.e. 'http://www.google.com', not 'www.google.com'). Relative URLs will be relative to the current page within the extension. Defaults to the New Tab Page."
+                 "description": "The URL to initially navigate the tab to. Fully-qualified URLs must include a scheme (i.e., 'http://www.google.com', not 'www.google.com'). Relative URLs are relative to the current page within the extension. Defaults to the New Tab Page."
                },
 +              "restoreData": {
 +                "type": "string",
@@ -319,5 +323,5 @@ index e457f47..939d638 100644
                  "type": "boolean",
                  "optional": true,
 -- 
-2.1.4
+2.11.0
 

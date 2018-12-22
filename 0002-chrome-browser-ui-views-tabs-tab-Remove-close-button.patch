@@ -1,25 +1,33 @@
-From ce538cad97b7cf5fbfaae97ddc908b2d783659e5 Mon Sep 17 00:00:00 2001
-From: My Name <my@email>
-Date: Mon, 13 Jul 2015 17:56:38 +0200
-Subject: [PATCH 2/7] chrome/browser/ui/views/tabs/tab: Remove close button
+From 7b68d4401074e47931a3a16b4f8d9cad23cfeefd Mon Sep 17 00:00:00 2001
+From: Martin Hostettler <textshell@uchuujin.de>
+Date: Fri, 21 Dec 2018 17:04:20 +0100
+Subject: [PATCH 2/9] chrome/browser/ui/views/tabs/tab: Remove close button
  from tab.
 
 ---
- chrome/browser/ui/views/tabs/tab.cc | 1 +
- 1 file changed, 1 insertion(+)
+ chrome/browser/ui/views/tabs/tab.cc | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/chrome/browser/ui/views/tabs/tab.cc b/chrome/browser/ui/views/tabs/tab.cc
-index 45a45ed..4a3efe3 100644
+index 6019825fa332..dedaf62bfc7a 100644
 --- a/chrome/browser/ui/views/tabs/tab.cc
 +++ b/chrome/browser/ui/views/tabs/tab.cc
-@@ -1737,6 +1737,7 @@ bool Tab::ShouldShowAlertIndicator() const {
- }
+@@ -862,6 +862,7 @@ void Tab::UpdateIconVisibility() {
+                               : kMinimumContentsWidthForCloseButtons);
  
- bool Tab::ShouldShowCloseBox() const {
-+  return false;
-   if (!IsActive() && controller_->ShouldHideCloseButtonForInactiveTabs())
-     return false;
+   showing_close_button_ = !controller_->ShouldHideCloseButtonForTab(this);
++  showing_close_button_ = false;
+   if (IsActive()) {
+     // Close button is shown on active tabs regardless of the size.
+     if (showing_close_button_)
+@@ -890,6 +891,7 @@ void Tab::UpdateIconVisibility() {
+     const bool show_on_hover = controller_->ShouldShowCloseButtonOnHover();
+     showing_close_button_ |= show_on_hover && hover_controller_.ShouldDraw();
+     showing_close_button_ &= large_enough_for_close_button;
++    showing_close_button_ = false;
+     if (showing_close_button_ || show_on_hover)
+       available_width -= close_button_width;
  
 -- 
-2.1.4
+2.11.0
 

@@ -1,0 +1,27 @@
+From 813f87c5269b19f8665e2056075d1b90e16f5d64 Mon Sep 17 00:00:00 2001
+From: Martin Hostettler <textshell@uchuujin.de>
+Date: Sat, 22 Dec 2018 19:53:14 +0100
+Subject: [PATCH 9/9] chrome/browser/resource_coordinator/tab_manager.cc:
+ Remove PurgeBackgroundedTabsIfNeeded, it seems not to cope well with many
+ tabs
+
+---
+ chrome/browser/resource_coordinator/tab_manager.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/chrome/browser/resource_coordinator/tab_manager.cc b/chrome/browser/resource_coordinator/tab_manager.cc
+index dd1a59a3cb13..5bf45485f1c3 100644
+--- a/chrome/browser/resource_coordinator/tab_manager.cc
++++ b/chrome/browser/resource_coordinator/tab_manager.cc
+@@ -444,7 +444,7 @@ void TabManager::UpdateTimerCallback() {
+   delegate_->AdjustOomPriorities();
+ #endif
+ 
+-  PurgeBackgroundedTabsIfNeeded();
++  //PurgeBackgroundedTabsIfNeeded();
+ }
+ 
+ base::TimeDelta TabManager::GetTimeToPurge(
+-- 
+2.11.0
+
